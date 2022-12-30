@@ -78,6 +78,88 @@ class  CNN_Text(nn.Module):
         
         return F.sigmoid(x)
 
+    
+class LSTM_Text(nn.Module):
+
+    def __init__(self, embedding , args):
+
+        super(LSTM_Text,self).__init__()
+        n_words = embedding.size()[0]        
+        emb_dim = embedding.size()[1]
+        self.args = args
+
+        C = 3
+        h = args.h
+        self.h = h
+        self.embed = nn.Embedding( n_words, emb_dim)
+        self.embed.weight = nn.Parameter(embedding,requires_grad=False)
+        self.lstm = nn.GRU(emb_dim, h, 1, batch_first=True, bidirectional = args.bidir, dropout= args.dropout)
+        self.dense = nn.Linear(512, 256)
+        
+        if args.bidir:
+            self.fc = nn.Linear(h, C)
+        else:
+            self.fc = nn.Linear(h, C)
+        
+        self.params = list(self.lstm.parameters()) + list(self.fc.parameters())
+        self.params += list(self.dense.parameters())
+
+    def forward(self, Note, Num, Disease, Mask, Age, Demo ):
+
+        E = self.embed(Note)
+
+        if self.args.bidir:
+            h0 = Variable(torch.zeros(2, Note.size()[0], self.h))
+            if self.args.flg_cuda:
+                h0 = h0.cuda()
+            elif self.args.flg_mps:
+                h0 = h0.to('mps')
+
+            z = self.lstm(E, h0)[0]
+            z = z.max(1)[0]
+
+        else:
+            h0 = Variable(torch.zeros(1, Note.size()[0], self.h))
+            if self.args.flg_cuda:
+                h0 = h0.cuda()
+            elif self.args.flg_mps:
+                h0 = h0.to('mps')
+
+            z = self.lstm(E, h0)[0][:, -1, :]
+
+        z = F.relu(self.dense(z))
+
+        y_hat = self.fc(z)
+        
+        return F.sigmoid(y_hat)
+    
+#    def forward(self,x):
+#                
+#        E = self.embed(x[:,:3000])
+#        demo = x[:,3000:3061].float()
+#
+#        if self.args.bidir:
+#            h0 = Variable(torch.zeros(2, x.size()[0], self.h))
+#            if self.args.gpu:
+#                h0 = h0.cuda()
+#
+#            z = self.lstm(E, h0)[0]
+#            z = z.max(1)[0]
+#
+#        else:
+#            h0 = Variable(torch.zeros(1, x.size()[0], self.h))
+#            if self.args.gpu:
+#                h0 = h0.cuda()
+#
+#            z = self.lstm(E, h0)[0][:, -1, :]
+#
+#        z = torch.cat([z,demo],1)
+#        z = F.relu(self.dense(z))
+#
+#        y_hat = self.fc(z)
+#        
+#        return F.sigmoid(y_hat)
+
 
 class  CNN_Dense(nn.Module):
 
@@ -456,62 +538,7 @@ class DWAN(nn.Module):
 
         return F.sigmoid(x)
 
-
-class LSTM_Text(nn.Module):
-
-    def __init__(self, embedding , args):
-
-        super(LSTM_Text,self).__init__()
-        n_words = embedding.size()[0]        
-        emb_dim = embedding.size()[1]
-        self.n_demo_feat = 61
-        self.args = args
-
-        C = 3
-        h = args.h
-        self.h = h
-        self.embed = nn.Embedding( n_words, emb_dim)
-        self.embed.weight = nn.Parameter(embedding,requires_grad=False)
-        self.dense = nn.Linear(512 + self.n_demo_feat,   256)
-
-        self.lstm = nn.GRU(emb_dim, h, 1, batch_first=True, bidirectional = args.bidir, dropout= args.dropout)
-
-        if args.bidir:
-            self.fc = nn.Linear(h, C)
-        else:
-            self.fc = nn.Linear(h, C)
-        
-        self.params = list(self.lstm.parameters()) + list(self.fc.parameters())
-        self.params += list(self.dense.parameters())
-
-    def forward(self,x):
-                
-        E = self.embed(x[:,:3000])
-        demo = x[:,3000:3061].float()
-
-        if self.args.bidir:
-            h0 = Variable(torch.zeros(2, x.size()[0], self.h))
-            if self.args.gpu:
-                h0 = h0.cuda()
-
-            z = self.lstm(E, h0)[0]
-            z = z.max(1)[0]
-
-        else:
-            h0 = Variable(torch.zeros(1, x.size()[0], self.h))
-            if self.args.gpu:
-                h0 = h0.cuda()
-
-            z = self.lstm(E, h0)[0][:, -1, :]
-
-        z = torch.cat([z,demo],1)
-        z = F.relu(self.dense(z))
-
-        y_hat = self.fc(z)
-        
-        return F.sigmoid(y_hat)
-
-
+    
 class LSTM_TR(nn.Module):
 
     def __init__(self, embedding):
