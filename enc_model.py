@@ -238,7 +238,8 @@ class Enc_SumLSTM(nn.Module):
             - bidir: whether to train bi-directional RNN or not
             - p_dropOut: dropOut percentage
             - lsDim: dimensions of [hidden_state, linear dimension 1, linear dimension 2...]
-            - flg_cuda: use GPU or not
+            - flg_cuda: use CUDA GPU or not
+            - flg_mps: use MPS GPU (Apple silicon or AMD) or not
             - emb_dim: embedding dimension, do not need if provide embedding
             - n_words: vocabulary size,  do not need if provide embedding
         To-do:
@@ -256,6 +257,7 @@ class Enc_SumLSTM(nn.Module):
         self.p_dropOut = model_paras.get('p_dropOut', 0.8)
         self.lsDim = model_paras.get('lsDim', [128, 1]) 
         self.flg_cuda = model_paras.get('flg_cuda', True)
+        self.flg_mps = model_paras.get('flg_mps', False)
         
         
         if embedding is not None:        
@@ -288,11 +290,15 @@ class Enc_SumLSTM(nn.Module):
         if self.rnnType == 'LSTM':
             if self.flg_cuda:
                 return  (Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).cuda(), Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).cuda() )
+            elif self.flg_mps:
+                return  (Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).to('mps'), Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).to('mps') )
             else:
                 return (Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])), Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])))
         else:
             if self.flg_cuda:
                 return Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).cuda()
+            if self.flg_mps:
+                return Variable(torch.zeros(nlayer, batchSize, self.lsDim[0])).to('mps')
             else:
                 return Variable(torch.zeros(nlayer, batchSize, self.lsDim[0]))
             
@@ -335,6 +341,7 @@ class Enc_CNN_LSTM(nn.Module):
         - p_dropOut: dropOut percentage
         - lsDim: dimensions of [hidden_state, multi-event dimension, 1]
         - flg_cuda: use GPU or not
+        - flg_mps: use MPS GPU (Apple silicon or AMD) or not
         - emb_dim: embedding dimension, do not need if provide embedding
         - n_words: vocabulary size,  do not need if provide embedding
         - filters: dimension of CNN output
@@ -354,6 +361,7 @@ class Enc_CNN_LSTM(nn.Module):
         self.p_dropOut = model_paras.get('p_dropOut', 0.8)
         self.lsDim = model_paras.get('lsDim')
         self.flg_cuda = model_paras.get('flg_cuda', True)
+        self.flg_mps = model_paras.get('flg_mps', False)
         self.filters = model_paras.get('filters', 128)
         self.Ks = model_paras.get('Ks', [1, 2])
         self.randn_std = model_paras.get('randn_std', None)
@@ -421,12 +429,17 @@ class Enc_CNN_LSTM(nn.Module):
             if self.flg_cuda:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda(),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda())
+            elif self.flg_mps:
+                return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'),
+                        Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'))
             else:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)))
         else:
             if self.flg_cuda:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda()
+            if self.flg_mps:
+                return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps')
             else:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM))
 
@@ -441,6 +454,8 @@ class Enc_CNN_LSTM(nn.Module):
         if (self.randn_std is not None) & (self.training == True):
             if self.flg_cuda:
                 noise = Variable(torch.randn(E.size()) * self.randn_std).cuda()
+            if self.flg_mps:
+                noise = Variable(torch.randn(E.size()) * self.randn_std).to('mps')
             else:
                 noise = Variable(torch.randn(E.size()) * self.randn_std)
             E = E + noise
@@ -489,6 +504,7 @@ class DemoLab(nn.Module):
         - p_dropOut: dropOut percentage
         - lsDim: dimensions of [hidden_state, multi-event dimension, 1]
         - flg_cuda: use GPU or not
+        - flg_mps: use MPS GPU (Apple silicon or AMD) or not
         - emb_dim: embedding dimension, do not need if provide embedding
         - randn_std: std of random noise on embedding
         """
@@ -504,6 +520,7 @@ class DemoLab(nn.Module):
         self.p_dropOut = model_paras.get('p_dropOut', 0.8)
         self.lsDim = model_paras.get('lsDim')
         self.flg_cuda = model_paras.get('flg_cuda', True)
+        self.flg_mps = model_paras.get('flg_mps', False)
         self.randn_std = model_paras.get('randn_std', None)
         self.lastRelu = model_paras.get('lastRelu', False)
         self.isViz = model_paras.get('isViz', False)
@@ -546,12 +563,17 @@ class DemoLab(nn.Module):
             if self.flg_cuda:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda(),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda())
+            elif self.flg_mps:
+                return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'),
+                        Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'))
             else:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)))
         else:
             if self.flg_cuda:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda()
+            elif self.flg_mps:
+                return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps')
             else:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM))
 
@@ -601,6 +623,7 @@ class Enc_CNN_LSTM_DemoLab(nn.Module):
         - p_dropOut: dropOut percentage
         - lsDim: dimensions of [hidden_state, multi-event dimension, 1]
         - flg_cuda: use GPU or not
+        - flg_mps: use MPS GPU (Apple silicon or AMD) or not
         - emb_dim: embedding dimension, do not need if provide embedding
         - n_words: vocabulary size,  do not need if provide embedding
         - filters: dimension of CNN output
@@ -620,6 +643,7 @@ class Enc_CNN_LSTM_DemoLab(nn.Module):
         self.p_dropOut = model_paras.get('p_dropOut', 0.8)
         self.lsDim = model_paras.get('lsDim')
         self.flg_cuda = model_paras.get('flg_cuda', True)
+        self.flg_mps = model_paras.get('flg_mps', False)
         self.filters = model_paras.get('filters', 128)
         self.Ks = model_paras.get('Ks', [1, 2])
         self.randn_std = model_paras.get('randn_std', None)
@@ -688,12 +712,17 @@ class Enc_CNN_LSTM_DemoLab(nn.Module):
             if self.flg_cuda:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda(),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda())
+            elif self.flg_mps:
+                return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'),
+                        Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps'))
             else:
                 return (Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)),
                         Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)))
         else:
             if self.flg_cuda:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).cuda()
+            elif self.flg_mps:
+                return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM)).to('mps')
             else:
                 return Variable(torch.zeros(nlayer, batchSize, self.dimLSTM))
 
@@ -708,6 +737,8 @@ class Enc_CNN_LSTM_DemoLab(nn.Module):
         if (self.randn_std is not None) & (self.training == True):
             if self.flg_cuda:
                 noise = Variable(torch.randn(E.size()) * self.randn_std).cuda()
+            if self.flg_mps:
+                noise = Variable(torch.randn(E.size()) * self.randn_std).to('mps')
             else:
                 noise = Variable(torch.randn(E.size()) * self.randn_std)
             E = E + noise
@@ -765,6 +796,7 @@ class trainModel(object):
         self.log_interval = train_paras.get('log_interval',
                                             1)  # list of two numbers: [log_per_n_epoch, log_per_n_batch]
         self.flg_cuda = train_paras.get('flg_cuda', False)
+        self.flg_mps = train_paras.get('flg_mps', False)
         # self.max_len = train_paras.get('max_len', 2000) # Max length of input
         self.lr_decay = train_paras.get('lr_decay',
                                         None)  # List of 4 numbers: [init_lr, lr_decay_rate, lr_decay_interval, min_lr]
@@ -851,6 +883,8 @@ class trainModel(object):
 
             if self.flg_cuda:
                 Note, Num, Disease, Mask, Age, Demo = Note.cuda(), Num.cuda(), Disease.cuda(), Mask.cuda(), Age.cuda(), Demo.cuda()
+            elif self.flg_mps:
+                Note, Num, Disease, Mask, Age, Demo = [t.to('mps') for t in [Note, Num, Disease, Mask, Age, Demo]]
 
             self.optimizer.zero_grad()
             Disease = Disease.squeeze(1)
@@ -865,6 +899,8 @@ class trainModel(object):
                 for fc in self.model.FCs:
                     if self.flg_cuda:
                         target_reg = Variable(torch.zeros(fc.weight.size())).cuda()
+                    elif self.flg_mps:
+                        target_reg = Variable(torch.zeros(fc.weight.size())).to('mps')
                     else:
                         target_reg = Variable(torch.zeros(fc.weight.size()))
                     loss += l1_crit(fc.weight, target_reg) * self.alpha_L1
@@ -879,7 +915,8 @@ class trainModel(object):
             self.mask_train.append(Mask.data.cpu().numpy())
 
             correct += self._getAccuracy(output, Disease, Mask)
-            train_loss += loss.data[0]
+            # train_loss += loss.data[0]
+            train_loss += loss.item()
             j += 1
             if (j % self.log_interval[1] == 0):
                 train_loss_temp = train_loss / np.sum(nRec)
@@ -922,6 +959,8 @@ class trainModel(object):
                     Demo, volatile=True).float()
                 if self.flg_cuda:
                     Note, Num, Disease, Mask, Age, Demo = Note.cuda(), Num.cuda(), Disease.cuda(), Mask.cuda(), Age.cuda(), Demo.cuda()
+                if self.flg_mps:
+                    Note, Num, Disease, Mask, Age, Demo = [t.to('mps') for t in [Note, Num, Disease, Mask, Age, Demo]]
                 with torch.no_grad():
                     output = self.model(Note, Num, Disease, Mask, Age, Demo)
                     Disease = Disease.squeeze(1)
@@ -929,7 +968,8 @@ class trainModel(object):
                     output = output * (1.0 - Mask)
                     Disease = Disease * (1.0 - Mask)
 
-                    test_loss += (self.criterion(output, Disease)).data[0]
+                    # test_loss += (self.criterion(output, Disease)).data[0]
+                    test_loss += (self.criterion(output, Disease)).item()
                     correct += self._getAccuracy(output, Disease, Mask)
 
                 self.Y_multi.append(output.data.cpu().numpy())
@@ -972,7 +1012,7 @@ class trainModel(object):
         tn = sum((Y == 0) & (Y_hat < self.posThres))
         p = sum(Y == 1)
         n = sum(Y == 0)
-        if len(np.unique(Y)) == 1:
+        if len(np.unique(Y)) <= 1:
             auc = 0
             f1 = 0
         else:

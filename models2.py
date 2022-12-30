@@ -713,6 +713,7 @@ class trainModel(object):
         self.n_iter = train_paras.get('n_iter', 1)
         self.log_interval = train_paras.get('log_interval', 5) # list of two numbers: [log_per_n_epoch, log_per_n_batch]
         self.flg_cuda = train_paras.get('flg_cuda', False)
+        self.flg_mps = train_paras.get('flg_mps', False)
         
         self.max_len = train_paras.get('max_len', 2000) # Max length of input
         self.lr_decay = train_paras.get('lr_decay', None) # List of 4 numbers: [init_lr, lr_decay_rate, lr_decay_interval, min_lr]
@@ -776,6 +777,8 @@ class trainModel(object):
 
             if self.flg_cuda:
                 data, target = data.cuda(), target.cuda()
+            if self.flg_mps:
+                data, target = data.to('mps'), target.to('mps')
             
             self.optimizer.zero_grad()
             
@@ -786,6 +789,8 @@ class trainModel(object):
                 w_pos = self.model.fc.weight + torch.abs(self.model.fc.weight)
                 if self.flg_cuda:
                     target_reg = Variable(torch.zeros(w_pos.size())).cuda()
+                elif self.flg_mps:
+                    target_reg = Variable(torch.zeros(w_pos.size())).to('mps')
                 else:
                     target_reg = Variable(torch.zeros(w_pos.size()))
                 loss += l1_crit(w_pos, target_reg) * self.alpha_wneg
@@ -793,7 +798,7 @@ class trainModel(object):
             loss.backward()
             self.optimizer.step()
             correct += self._getAccuracy(output, target) 
-            train_loss += loss.data[0] * data.size()[0]
+            # train_loss += loss.data[0] * data.size()[0]
             j += 1
             if (j % self.log_interval[1] == 0):
                 print('Train Epoch: {}, Batch: {}, Loss: {:.4f}'.format(epoch, j, train_loss/nRec))
@@ -821,6 +826,8 @@ class trainModel(object):
                 data, target = Variable(data).long(), Variable(target.unsqueeze(1)).float()
                 if self.flg_cuda:
                     data, target = data.cuda(), target.cuda()
+                elif self.flg_mps:
+                    data, target = data.to('mps'), target.to('mps')
                 
                 output = self.model(data)
                 test_loss += self.criterion(output, target).data[0]

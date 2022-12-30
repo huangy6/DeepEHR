@@ -56,6 +56,8 @@ if __name__ == '__main__':
     parser.add_argument("--batchSizeNeg", type=int, default=0)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--flg_cuda", action='store_true')
+    parser.add_argument("--flg_mps", action='store_true')
+    parser.add_argument("--cuda_dev", type=int, default=0)
     parser.add_argument("--emb_dim", type=int, default=300)  # Embedding dimension
     parser.add_argument("--logInterval", type=int, default=1)  # Print test accuracy every n epochs
     parser.add_argument("--flgSave", action='store_true')
@@ -74,6 +76,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if args.flg_cuda:
+        torch.cuda.set_device(args.cuda_dev)
+        
     torch.manual_seed(args.randSeed)  # For reproducible results
     if args.flgSave:
         if not os.path.isdir(args.savePath):
@@ -118,7 +123,7 @@ if __name__ == '__main__':
 
 
     print('To Loader')
-    if args.flg_cuda:
+    if args.flg_cuda or args.flg_mps:
         train_loader_pos = torch.utils.data.DataLoader(trainset_pos, batch_size=args.batchSizePos, shuffle=True,
                                                        pin_memory=True)
         test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batchSizePos + args.batchSizeNeg,
@@ -139,7 +144,7 @@ if __name__ == '__main__':
                    'flg_bn': args.batch_norm,
                    'rnnType': args.rnnType, 'bidir': args.bidir, 'p_dropOut': args.p_dropOut, 'lsDim': lsDim,
                    'dimLSTM': args.dimLSTM,
-                   'flg_cuda': args.flg_cuda, 'filters': args.filters, 'Ks': [i + 1 for i in range(args.nK)],
+                   'flg_cuda': args.flg_cuda, 'flg_mps': args.flg_mps, 'filters': args.filters, 'Ks': [i + 1 for i in range(args.nK)],
                    'randn_std': args.randn_std, 'lastRelu': True, 'flgBias': args.flgBias,
                    'flg_AllLSTM': args.flg_AllLSTM,
                    'flg_useNum': args.flg_useNum, 'dimLSTM_num': args.dimLSTM_num}
@@ -161,12 +166,16 @@ if __name__ == '__main__':
         static_model_args.n_out = 3
         static_model_args.h = args.filters
         static_model_args.n_demo_feat = 208
+        static_model_args.flg_cuda = args.flg_cuda
+        static_model_args.flg_mps = args.flg_mps
 
         model = getattr(m, args.modelName)(embedding , static_model_args)
 
 
     if args.flg_cuda:
         model = model.cuda()
+    elif args.flg_mps:
+        model = model.to('mps')
 
     print(model)
 
@@ -174,7 +183,7 @@ if __name__ == '__main__':
 
     print("Beginning Training")
     train_paras = {'n_iter': args.n_iter, 'log_interval': [args.logInterval, 1000], 'flg_cuda': args.flg_cuda,
-                   'lr_decay': [args.lr, 0.9, args.lr_decay3, 1e-5],
+                   'flg_mps': args.flg_mps, 'lr_decay': [args.lr, 0.9, args.lr_decay3, 1e-5],
                    'flgSave': args.flgSave, 'savePath': args.savePath, 'posThres': args.posThres,
                    'alpha_L1': args.alpha_L1, 'flg_gradClip': args.flg_gradClip}
 
