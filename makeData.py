@@ -29,9 +29,14 @@ import numpy as np
 import argparse
 import json
 import os
-import util
 import pickle
+import util
 #import pdb
+
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.pipeline import Pipeline
+from scipy import sparse, stats
+from scipy.special import expit
 
 def makeNotes(maxIdx = 1000, maxDocLen = 800):
     '''
@@ -86,6 +91,42 @@ def makeRecord(maxWordIdx, maxEncounter = 30):
     Ethnic = np.random.choice(29)
     return [Notes, Num, Disease, Mask, Age, Gender, Race, Ethnic]
 
+def makeLabels(records, notes_coef_scale=2, coef_density=.5, min_prop_pos=0.05, max_prop_pos=0.95):
+    '''
+    Generate synthetic labels based on tfidf vectors of Notes and averaged numerical fields
+    '''
+    Notes, Num, Disease, Mask, Age, Gender, Race, Ethnic = zip(*records)
+    corpus = [[item for sublist in Note for item in sublist] for Note in Notes]
+    ident = lambda x: x
+
+    pipe = Pipeline([('count', CountVectorizer(tokenizer=ident, preprocessor=ident, max_features=100)),
+                     ('tfidf', TfidfTransformer())]).fit(corpus)
+    
+    notes_tfidf = pipe.transform(corpus)
+    num_avg = np.array([np.mean(n, axis=0) for n in Num])
+    
+    labels = np.zeros((len(records), 3))
+    prop_positive = lambda labels: labels.sum(axis=0) / len(records)
+    # Re-roll coefficients until positive proportion in range
+    # DANGER possible never ending loop
+    while (prop_positive(labels) < min_prop_pos).any() or (prop_positive(labels) > max_prop_pos).any(): 
+        notes_rvs = stats.uniform(-notes_coef_scale, 2*notes_coef_scale).rvs
+        num_rvs = stats.uniform(-1, 2).rvs
+        notes_coef = sparse.random(notes_tfidf.shape[1], 3, density=coef_density, data_rvs=notes_rvs)
+        num_coef = sparse.random(num_avg.shape[1], 3, density=coef_density, data_rvs=num_rvs)
+        coef = np.vstack((notes_coef.toarray(), num_coef.toarray()))
+        
+        labels = []
+        for note, num in zip(notes_tfidf, num_avg):
+            input_vec = np.concatenate((note.toarray().reshape(-1), num))
+            labels.append(np.rint(expit(np.dot(coef.T, input_vec))))
+        labels = np.array(labels)
+    
+    print(f'Proportions of positive class: {prop_positive(labels)}')
+    labels = [a.tolist() for a in labels]
+    return list(zip(Notes, Num, labels, Mask, Age, Gender, Race, Ethnic))
+    
+    
 def splitPos(dfTrain):
     dfTrainPos, dfTrainNeg = [], []
     for row in dfTrain:
@@ -113,6 +154,7 @@ if __name__ == '__main__':
 
     for i in range(args.nRec):
         df.append(makeRecord(maxWordIdx))
+    df = makeLabels(df)
 
     n = int(args.nRec/2)
     dfTrain, dfDev = df[0:n], df[n:]
